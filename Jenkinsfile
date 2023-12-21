@@ -1,2 +1,2 @@
 @Library('xor-jenkins-shared-library') _
-infra_cluster_creation()
+infra_cluster_creation(["Cluster-creation/main"])
