@@ -1,0 +1,18 @@
+- hosts: localhost
+  become_user: postgres
+  tasks:
+  - name: debug
+    debug:
+      var: playbook_dir
+  - name: Run the schema
+    shell: PGPASSWORD={{password}} psql -h {{ host }} -d {{db_name}} -U {{ master_user }}  < ../../environmentCreation/schema.sql
+  - name: Run DDl commands script
+    shell: PGOPTIONS="--search_path={{schema_name}}"  PGPASSWORD={{password}} psql -h {{ host }} -d {{db_name}} -U {{ db_user }}  < ../../environmentCreation/gf-{{lob}}-{{client_name}}-{{envSubdomain}}/DDL.sql
+  - name: Run config file
+    shell: PGOPTIONS="--search_path={{schema_name}}"  PGPASSWORD={{password}} psql -h {{ host }} -d {{db_name}} -U {{ db_user }}  < ../../environmentCreation/gf-{{lob}}-{{client_name}}-{{envSubdomain}}/DML_config.sql
+  - name: Rune master config file
+    shell: PGOPTIONS="--search_path={{schema_name}}"  PGPASSWORD={{password}} psql -h {{ host }} -d {{db_name}} -U {{ db_user }}  < ../../environmentCreation/gf-{{lob}}-{{client_name}}-{{envSubdomain}}/DML_master.sql
+  - name: Running grant scripts
+    shell: PGOPTIONS="--search_path={{schema_name}}"  PGPASSWORD={{password}} psql -h {{ host }} -d {{db_name}} -U {{ master_user }}  < ../../environmentCreation/grant.sql 
+
+

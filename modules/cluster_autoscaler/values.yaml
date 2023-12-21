@@ -1,0 +1,66 @@
+autoscalingGroups: []
+  # - name: asg1
+  #   maxSize: 1
+  #   minSize: 1
+
+#awsRegion: us-east-1
+
+image:
+  repository: k8s.gcr.io/autoscaling/cluster-autoscaler
+  tag: v1.19.1
+  pullPolicy: IfNotPresent
+
+cloudProvider: aws
+
+extraArgs:
+  v: 4
+  stderrthreshold: info
+  logtostderr: true
+  skip-nodes-with-local-storage: false
+  expander: least-waste
+  balance-similar-node-groups: true
+  skip-nodes-with-system-pods: false
+
+nodeSelector: {}
+
+podAnnotations: {
+  "cluster-autoscaler.kubernetes.io/safe-to-evict": "false",
+  "prometheus.io/port" : "8085",
+  "prometheus.io/scrape" : "true"
+
+}
+replicaCount: 1
+
+resources:
+  limits:
+    cpu: 100m
+    memory: 600Mi
+  requests:
+    cpu: 100m
+    memory: 600Mi
+
+priorityClassName: ""
+
+service:
+  annotations: {}
+  clusterIP: ""
+  externalIPs: []
+  loadBalancerIP: ""
+  loadBalancerSourceRanges: []
+  servicePort: 8085
+  type: ClusterIP
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 65534
+  fsGroup: 65534
+
+extraVolumeMounts:
+  - name: ssl-certs
+    mountPath: /etc/ssl/certs/ca-certificates.crt
+    readOnly: true
+
+extraVolumes:
+  - name: ssl-certs
+    hostPath:
+      path: /etc/ssl/certs/ca-bundle.crt

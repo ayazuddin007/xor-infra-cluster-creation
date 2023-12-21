@@ -1,0 +1,54 @@
+global:
+  name: consul
+  datacenter: dc1
+  image: hashicorp/consul:1.9.4
+ui:
+  enabled: true
+  service:
+    enabled: true
+    type: ClusterIP
+
+connectInject:
+  enabled: true
+  sidecarProxy:
+    resources:
+      requests:
+        memory: 100Mi
+        cpu: 100m
+      limits:
+        memory: 100Mi
+        cpu: 100m
+controller:
+  enabled: true
+prometheus:
+  enabled: false
+grafana:
+  enabled: false
+
+securityContext:
+    runAsNonRoot: true
+    runAsGroup: 1000
+    runAsUser: 100
+    fsGroup: 1000
+
+readinessProbe:
+            # NOTE(mitchellh): when our HTTP status endpoints support the
+            # proper status codes, we should switch to that. This is temporary.
+            exec:
+              command:
+                - "/bin/sh"
+                - "-ec"
+                - |
+                  {{- if .Values.global.tls.enabled }}
+                  curl \
+                    --cacert /consul/tls/ca/tls.crt \
+                    https://127.0.0.1:8501/v1/status/leader \
+                  {{- else }}
+                  curl http://127.0.0.1:8500/v1/status/leader \
+                  {{- end }}
+                  2>/dev/null | grep -E '".+"'
+            failureThreshold: 5
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 5

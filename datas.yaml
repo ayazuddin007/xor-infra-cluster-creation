@@ -1,0 +1,6 @@
+slaveIP: |
+  10.97.42.125
+slaveName: slave
+clusterRepoName: Cluster-creation
+clusterRepoBranch: main
+dir2_path: /home/ec2-user/Cluster-creation

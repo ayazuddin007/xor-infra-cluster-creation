@@ -1,0 +1,140 @@
+alertmanager:
+  config:
+    global:
+      resolve_timeout: 5m
+    route:
+      group_by: ['alertname','job']
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 30m
+      receiver: 'prometheus-alert'
+      routes:
+      - match:
+          severity: critical
+        receiver: 'prometheus-alert'
+    receivers:
+    - name: 'prometheus-alert'
+      email_configs:
+      - to: aishwarya.poojary@wexinc.com
+        send_resolved: true
+        from: alertmanager@example.org
+        smarthost: mailhog:1025
+        # smarthost: 10.97.41.212:25
+        # auth_username: ""
+        # auth_password: ""
+        require_tls: false
+
+defaultRules:
+  create: true
+  rules:
+    kubernetesApps: false
+additionalPrometheusRules:
+  - name: kubernetes-apps
+    groups:
+    - name: kubernetes-apps
+      rules:
+      - alert: KubePodCrashLooping
+        annotations:
+          message: Pod {{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container }}) is restarting {{ printf "%.2f" $value }} times / 5 minutes.
+          runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubepodcrashlooping
+        expr: rate(kube_pod_container_status_restarts_total{job="kube-state-metrics", namespace=~"{{ $targetNamespace }}"}[5m]) * 60 * 5 > 0
+        for: 5m
+        labels:
+          severity: critical
+
+      - alert: KubePodNotReady
+        annotations:
+          message: Pod {{ $labels.namespace }}/{{ $labels.pod }} has been in a non-ready state for longer than 5 minutes.
+          runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubepodnotready
+          summary: Pod has been in a non-ready state for more than 5 minutes.
+        expr: |-
+          sum by (namespace, pod) (kube_pod_status_phase{job="kube-state-metrics", phase=~"Pending|Unknown"}) > 0
+        for: 5m
+        labels:
+          severity: critical
+
+prometheus:
+ prometheusSpec:
+   additionalScrapeConfigs:
+  #Scan spring microservice containers (if any) and add them - only configs that contain the tag spring
+     - job_name: springscanners
+       consul_sd_configs:
+         - server: 'consul-server.consul.svc.cluster.local:8500'
+       relabel_configs:
+         - source_labels: [__meta_consul_tags]
+           regex: .*,spring,.*
+           action: keep
+         - source_labels: [__meta_consul_service]
+           target_label: job
+         - source_labels: ['__meta_consul_service_address', '__meta_consul_service_port']
+           separator: ':'
+           regex: '(.*)'
+           target_label: '__address__'
+           replacement: '$1'
+           action: replace
+         - source_labels: [__metrics_path__]
+           separator: ;
+           regex: /metrics
+           target_label: __metrics_path__
+           replacement: /actuator/prometheus
+           action: replace
+#Scan microservice kubernetes pods and add them - only pods that contain the prometheus annotations
+     - job_name: 'kubernetes-pods'
+       kubernetes_sd_configs:
+       - role: pod
+       relabel_configs:
+         - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+           action: keep
+           regex: true
+         - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+           action: replace
+           target_label: __metrics_path__
+           regex: (.+)
+         - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+           action: replace
+           regex: ([^:]+)(?::\d+)?;(\d+)
+           replacement: $1:$2
+           target_label: __address__
+         - action: labelmap
+           regex: __meta_kubernetes_pod_label_(.+)
+         - source_labels: [__meta_kubernetes_namespace]
+           action: replace
+           target_label: namespace
+         - source_labels: [__meta_kubernetes_pod_name]
+           action: replace
+           target_label: pod
+grafana:
+  adminUser: admin
+  sidecar:
+    datasources:
+      enabled: true
+      label: grafana_datasource
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+  datasources:
+    datasources.yaml:
+      apiVersion: 1
+      datasources:
+        - name: CloudWatch
+          type: cloudwatch
+          editable: false
+          jsonData:
+            authType: AWS SDK Default
+            defaultRegion: eu-central-1
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+      - name: 'default'
+        orgId: 1
+        folder: ''
+        type: file
+        disableDeletion: false
+        editable: true
+        options:
+          path: /var/lib/grafana/dashboards/default
+#  dashboards:
+#    default:
+#      aws-rds-logs:
+#        url: https://grafana.com/api/dashboards/707/revisions/5/ 
